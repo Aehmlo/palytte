@@ -50,7 +50,4 @@ printIfExists (Just x) = print x
 printIfExists Nothing = pure ()
 
 main :: IO ()
-main = do
-  generations <- allGenerations
-  base <- baseGeneration generations
-  printIfExists base
+main = allGenerations >>= baseGeneration >>= printIfExists
