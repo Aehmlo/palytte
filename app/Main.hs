@@ -4,7 +4,7 @@ import Control.Monad (filterM)
 import Data.Functor ((<&>))
 import Data.List (lines)
 import Data.List.Split (splitOn)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, mapMaybe)
 import System.Directory (doesDirectoryExist, doesFileExist)
 import System.FilePath (FilePath, (</>))
 import System.Process (readProcess)
@@ -16,14 +16,13 @@ instance Show Generation where
 
 newtype Specialisation = Specialisation String
 
-parseGeneration :: String -> Generation
-parseGeneration entry =
-  let parts = splitOn " -> " entry
-      gen = parts !! 1
-   in Generation gen
+parseGeneration :: String -> Maybe Generation
+parseGeneration entry = case splitOn " -> " entry of
+  (_:path:_) -> Just $ Generation path
+  _ -> Nothing
 
 allGenerations :: IO [Generation]
-allGenerations = readProcess "home-manager" ["generations"] [] <&> (map parseGeneration . lines)
+allGenerations = readProcess "home-manager" ["generations"] [] <&> (mapMaybe parseGeneration . lines)
 
 hasAnySpecialisation :: Generation -> IO Bool
 hasAnySpecialisation (Generation gen) = doesDirectoryExist (gen </> "specialisation")
