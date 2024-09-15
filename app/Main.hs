@@ -1,14 +1,17 @@
 module Main where
 
+import Control.Exception (bracket_)
 import Control.Monad (filterM)
 import Data.Functor ((<&>))
 import Data.List (lines)
 import Data.List.Split (splitOn)
 import Data.Maybe (listToMaybe, mapMaybe)
 import Options.Applicative
+import System.Console.ANSI
 import System.Directory (doesDirectoryExist, doesFileExist)
 import System.Exit (ExitCode (ExitFailure, ExitSuccess))
 import System.FilePath (FilePath, (</>))
+import System.IO (hFlush, stdout)
 import System.Process (createProcess, proc, readProcess, waitForProcess)
 
 newtype Generation = Generation FilePath
@@ -75,6 +78,21 @@ activateFromPath path = do
     ExitSuccess -> Left ()
     ExitFailure code -> Right ()
 
+printInfo :: String -> IO ()
+printInfo msg = do
+  color <- hNowSupportsANSI stdout
+  if color
+    then
+      bracket_
+        ( setSGR
+            [ SetColor Foreground Dull Magenta,
+              SetConsoleIntensity BoldIntensity
+            ]
+        )
+        (setSGR [Reset] >> hFlush stdout)
+        (putStrLn msg)
+    else putStrLn msg
+
 activateGeneration :: Maybe Specialisation -> Generation -> IO (Either () ())
 activateGeneration spec (Generation path) =
   let (message, script) = case spec of
@@ -84,7 +102,7 @@ activateGeneration spec (Generation path) =
             path </> "specialisation" </> name </> "activate"
           )
    in do
-        putStrLn message
+        printInfo message
         activateFromPath script
 
 options :: ParserInfo (Maybe Specialisation)
