@@ -70,7 +70,8 @@ executable palytte
         process ^>=1.6.19,
         split ^>=0.2.5,
         filepath ^>=1.4,
-        directory ^>=1.3.8
+        directory ^>=1.3.8,
+        optparse-applicative ^>=0.18.1
 
     -- Directories containing source files.
     hs-source-dirs:   app

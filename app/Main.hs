@@ -5,9 +5,11 @@ import Data.Functor ((<&>))
 import Data.List (lines)
 import Data.List.Split (splitOn)
 import Data.Maybe (listToMaybe, mapMaybe)
+import Options.Applicative
 import System.Directory (doesDirectoryExist, doesFileExist)
+import System.Exit (ExitCode (ExitFailure, ExitSuccess))
 import System.FilePath (FilePath, (</>))
-import System.Process (readProcess)
+import System.Process (createProcess, proc, readProcess, waitForProcess)
 
 newtype Generation = Generation FilePath
 
@@ -16,9 +18,24 @@ instance Show Generation where
 
 newtype Specialisation = Specialisation String
 
+instance Show Specialisation where
+  show (Specialisation spec) = spec
+
+specialisation :: Parser (Maybe Specialisation)
+specialisation =
+  fmap Specialisation
+    <$> optional
+      ( strOption
+          ( long "to"
+              <> short 't'
+              <> metavar "NAME"
+              <> help "Target specialisation name"
+          )
+      )
+
 parseGeneration :: String -> Maybe Generation
 parseGeneration entry = case splitOn " -> " entry of
-  (_:path:_) -> Just $ Generation path
+  (_ : path : _) -> Just $ Generation path
   _ -> Nothing
 
 allGenerations :: IO [Generation]
@@ -45,9 +62,57 @@ generationWith spec = firstM (hasSpecialisation spec)
 baseGeneration :: [Generation] -> IO (Maybe Generation)
 baseGeneration = firstM hasAnySpecialisation
 
-printIfExists :: (Show a) => Maybe a -> IO ()
-printIfExists (Just x) = print x
-printIfExists Nothing = pure ()
+readProcessExitWithPassthrough :: FilePath -> IO ExitCode
+readProcessExitWithPassthrough path = do
+  let create = proc path []
+  (_, _, _, handle) <- createProcess create
+  waitForProcess handle
 
-main :: IO ()
-main = allGenerations >>= baseGeneration >>= printIfExists
+activateFromPath :: FilePath -> IO (Either () ())
+activateFromPath path = do
+  exit <- readProcessExitWithPassthrough path
+  pure $ case exit of
+    ExitSuccess -> Left ()
+    ExitFailure code -> Right ()
+
+activateGeneration :: Maybe Specialisation -> Generation -> IO (Either () ())
+activateGeneration spec (Generation path) =
+  let (message, script) = case spec of
+        Nothing -> ("Activating generation " ++ path, path </> "activate")
+        Just (Specialisation name) ->
+          ( "Activating specialisation " ++ name ++ " of generation " ++ path,
+            path </> "specialisation" </> name </> "activate"
+          )
+   in do
+        putStrLn message
+        activateFromPath script
+
+options :: ParserInfo (Maybe Specialisation)
+options =
+  info
+    specialisation
+    ( fullDesc
+        <> progDesc "Switch between home-manager specialisations"
+        <> header "palytte - a home-manager helper"
+    )
+
+switchToSpecialisation :: Specialisation -> IO (Either () ())
+switchToSpecialisation spec = do
+  generations <- allGenerations
+  target <- generationWith spec generations
+  case target of
+    Just gen -> activateGeneration (Just spec) gen
+    Nothing -> putStrLn "Failed to find generation" <&> Right
+
+switchToDefault :: IO (Either () ())
+switchToDefault = do
+  generations <- allGenerations
+  target <- baseGeneration generations
+  case target of
+    Just gen -> activateGeneration Nothing gen
+    Nothing -> putStrLn "Failed to find generation" <&> Right
+
+main :: IO (Either () ())
+main = do
+  spec <- execParser options
+  maybe switchToDefault switchToSpecialisation spec
