@@ -11,4 +11,4 @@ format-nix:
 
 # Format Haskell source code
 format-haskell:
-    ormolu --mode inplace app/*.hs
+    ormolu --mode inplace app/**/*.hs

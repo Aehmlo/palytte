@@ -1,69 +1,17 @@
 module Main where
 
 import Control.Exception (bracket_)
-import Control.Monad (filterM)
 import Data.Functor ((<&>))
-import Data.List (lines)
-import Data.List.Split (splitOn)
 import Data.Maybe (listToMaybe, mapMaybe)
-import Options.Applicative
+import Options.Applicative (execParser)
+import Palytte.Control.Generation
+import Palytte.Data.Generation
+import Palytte.Parse
 import System.Console.ANSI
-import System.Directory (doesDirectoryExist, doesFileExist)
 import System.Exit (ExitCode (ExitFailure, ExitSuccess))
 import System.FilePath (FilePath, (</>))
 import System.IO (hFlush, stdout)
-import System.Process (createProcess, proc, readProcess, waitForProcess)
-
-newtype Generation = Generation FilePath
-
-instance Show Generation where
-  show (Generation path) = path
-
-newtype Specialisation = Specialisation String
-
-instance Show Specialisation where
-  show (Specialisation spec) = spec
-
-specialisation :: Parser (Maybe Specialisation)
-specialisation =
-  fmap Specialisation
-    <$> optional
-      ( strOption
-          ( long "to"
-              <> short 't'
-              <> metavar "NAME"
-              <> help "Target specialisation name"
-          )
-      )
-
-parseGeneration :: String -> Maybe Generation
-parseGeneration entry = case splitOn " -> " entry of
-  (_ : path : _) -> Just $ Generation path
-  _ -> Nothing
-
-allGenerations :: IO [Generation]
-allGenerations = readProcess "home-manager" ["generations"] [] <&> (mapMaybe parseGeneration . lines)
-
-hasAnySpecialisation :: Generation -> IO Bool
-hasAnySpecialisation (Generation gen) = doesDirectoryExist (gen </> "specialisation")
-
-hasSpecialisation :: Specialisation -> Generation -> IO Bool
-hasSpecialisation (Specialisation spec) (Generation gen) =
-  doesFileExist (gen </> "specialisation" </> spec </> "activate")
-
--- Given a monadic filtering function and a list of values, return the first
--- value passing the filter (or None)
-firstM :: (Monad m) => (a -> m Bool) -> [a] -> m (Maybe a)
-firstM filter xs = filterM filter xs <&> listToMaybe
-
--- Find newest generation with the appropriate specialisation
-generationWith :: Specialisation -> [Generation] -> IO (Maybe Generation)
-generationWith spec = firstM (hasSpecialisation spec)
-
--- Find newest generation that has any specialisation (implying it is itself
--- not a specialisation)
-baseGeneration :: [Generation] -> IO (Maybe Generation)
-baseGeneration = firstM hasAnySpecialisation
+import System.Process (createProcess, proc, waitForProcess)
 
 readProcessExitWithPassthrough :: FilePath -> IO ExitCode
 readProcessExitWithPassthrough path = do
@@ -104,15 +52,6 @@ activateGeneration spec (Generation path) =
    in do
         printInfo message
         activateFromPath script
-
-options :: ParserInfo (Maybe Specialisation)
-options =
-  info
-    specialisation
-    ( fullDesc
-        <> progDesc "Switch between home-manager specialisations"
-        <> header "palytte - a home-manager helper"
-    )
 
 switchToSpecialisation :: Specialisation -> IO (Either () ())
 switchToSpecialisation spec = do
