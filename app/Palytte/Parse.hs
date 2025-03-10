@@ -25,6 +25,7 @@ specialisation =
       ( strOption
           ( long "specialisation"
               <> short 's'
+              <> short 'c'
               <> metavar "NAME"
               <> help "Name of desired specialisation"
           )
