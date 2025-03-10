@@ -5,15 +5,15 @@
   };
   outputs = { self, nixpkgs, systems }:
     let
+      mkHaskellPackages = pkgs: pkgs.haskellPackages.extend (pkgs.haskell.lib.compose.packageSourceOverrides {
+        palytte = self;
+      });
       forAllSystems = nixpkgs.lib.genAttrs (import systems);
       forAllPkgs = f: forAllSystems (system: f nixpkgs.legacyPackages.${system});
       forAllHaskellPackages' = f: forAllSystems (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          inherit (pkgs) lib;
-          haskellPackages = pkgs.haskellPackages.extend (pkgs.haskell.lib.compose.packageSourceOverrides {
-            palytte = self;
-          });
+          haskellPackages = mkHaskellPackages pkgs;
         in
         f pkgs haskellPackages
       );
@@ -27,10 +27,23 @@
           buildInputs = with pkgs; [ hlint just ormolu ];
         };
       });
+
       packages = forAllHaskellPackages (hs: {
         inherit (hs) palytte;
         default = hs.palytte;
       });
+
       formatter = forAllPkgs (pkgs: pkgs.nixpkgs-fmt);
+
+      overlays = rec {
+        palytte = _final: prev:
+          let
+            haskellPackages = mkHaskellPackages prev;
+          in
+          {
+            inherit (haskellPackages) palytte;
+          };
+        default = palytte;
+      };
     };
 }
