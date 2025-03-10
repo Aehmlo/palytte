@@ -4,6 +4,20 @@ import Data.List.Split (splitOn)
 import Options.Applicative
 import Palytte.Data.Generation (Generation (..), Specialisation (..))
 
+parseGeneration :: String -> Maybe Generation
+parseGeneration entry = case splitOn " -> " entry of
+  (_ : path : _) -> Just $ Generation path
+  _ -> Nothing
+
+newtype SwitchOptions = SwitchOptions {switchTarget :: Maybe Specialisation} deriving (Show)
+
+newtype ListOptions = ListOptions {listAll :: Bool} deriving (Show)
+
+data Command
+  = Switch SwitchOptions
+  | List ListOptions
+  deriving (Show)
+
 specialisation :: Parser (Maybe Specialisation)
 specialisation =
   fmap Specialisation
@@ -16,16 +30,33 @@ specialisation =
           )
       )
 
-parseGeneration :: String -> Maybe Generation
-parseGeneration entry = case splitOn " -> " entry of
-  (_ : path : _) -> Just $ Generation path
-  _ -> Nothing
+all :: Parser Bool
+all = switch (long "all" <> short 'a' <> help "List all available generations")
 
-options :: ParserInfo (Maybe Specialisation)
-options =
+listOptions :: ParserInfo ListOptions
+listOptions =
   info
-    specialisation
+    ((ListOptions <$> Palytte.Parse.all) <**> helper)
     ( fullDesc
-        <> progDesc "Switch between home-manager specialisations"
-        <> header "palytte - a home-manager helper"
+        <> progDesc "List home-manager generations"
     )
+
+switchOptions :: ParserInfo SwitchOptions
+switchOptions =
+  SwitchOptions
+    <$> info
+      (specialisation <**> helper)
+      ( fullDesc
+          <> progDesc "Switch between home-manager specialisations"
+      )
+
+subcommand :: ParserInfo Command
+subcommand =
+  info
+    ( subparser
+        ( command "switch" (Switch <$> switchOptions)
+            <> command "list-generations" (List <$> listOptions)
+        )
+        <**> helper
+    )
+    (header "palytte - a home-manager helper")

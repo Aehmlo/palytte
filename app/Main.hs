@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Exception (bracket_)
+import Control.Monad (mapM_)
 import Data.Functor ((<&>))
 import Data.Maybe (listToMaybe, mapMaybe)
 import Options.Applicative (execParser)
@@ -69,7 +70,14 @@ switchToDefault = do
     Just gen -> activateGeneration Nothing gen
     Nothing -> putStrLn "Failed to find generation" <&> Right
 
+runCommand :: Command -> IO (Either () ())
+runCommand command = case command of
+  Switch SwitchOptions{ switchTarget=target } ->
+    maybe switchToDefault switchToSpecialisation target
+  List ListOptions{ listAll=listAll } -> do
+    generations <- allGenerations
+    let gens = if listAll then generations else take 1 generations
+    Left <$> mapM_ print gens
+
 main :: IO (Either () ())
-main = do
-  spec <- execParser options
-  maybe switchToDefault switchToSpecialisation spec
+main = execParser subcommand >>= runCommand
