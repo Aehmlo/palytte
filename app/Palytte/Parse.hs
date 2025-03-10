@@ -9,10 +9,10 @@ specialisation =
   fmap Specialisation
     <$> optional
       ( strOption
-          ( long "to"
-              <> short 't'
+          ( long "specialisation"
+              <> short 's'
               <> metavar "NAME"
-              <> help "Target specialisation name"
+              <> help "Name of desired specialisation"
           )
       )
 
