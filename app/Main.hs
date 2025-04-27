@@ -24,8 +24,8 @@ activateFromPath :: FilePath -> IO (Either () ())
 activateFromPath path = do
   exit <- readProcessExitWithPassthrough path
   pure $ case exit of
-    ExitSuccess -> Left ()
-    ExitFailure code -> Right ()
+    ExitSuccess -> Right ()
+    ExitFailure code -> Left ()
 
 printInfo :: String -> IO ()
 printInfo msg = do
@@ -60,7 +60,7 @@ switchToSpecialisation spec = do
   target <- generationWith spec generations
   case target of
     Just gen -> activateGeneration (Just spec) gen
-    Nothing -> putStrLn "Failed to find generation" <&> Right
+    Nothing -> putStrLn "Failed to find generation" <&> Left
 
 switchToDefault :: IO (Either () ())
 switchToDefault = do
@@ -68,7 +68,7 @@ switchToDefault = do
   target <- baseGeneration generations
   case target of
     Just gen -> activateGeneration Nothing gen
-    Nothing -> putStrLn "Failed to find generation" <&> Right
+    Nothing -> putStrLn "Failed to find generation" <&> Left
 
 runCommand :: Command -> IO (Either () ())
 runCommand command = case command of
@@ -77,7 +77,7 @@ runCommand command = case command of
   List ListOptions{ listAll=listAll } -> do
     generations <- allGenerations
     let gens = if listAll then generations else take 1 generations
-    Left <$> mapM_ print gens
+    Right <$> mapM_ print gens
 
 main :: IO (Either () ())
 main = execParser subcommand >>= runCommand
